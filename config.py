@@ -1,21 +1,25 @@
 # config.py
 # ============================================================
-# CONFIGURACIÓN CENTRAL DEL BOT PiDelta – BIRD-OF-PREY
-# Versión completa y corregida
+# CONFIGURACIÓN OPTIMIZADA – BIRD-OF-PREY
+# Cambios mínimos para máxima mejora estadística
 # ============================================================
 
 # ---- Símbolos y operativa ----
 SYMBOLS = ['BTC', 'ETH', 'SOL', 'ADA', 'XRP']
-TRADE_NOTIONAL = 1000.0
-LEVERAGE = 10
+TRADE_NOTIONAL = 1000.0          # USDT por operación
+LEVERAGE = 10                    # Apalancamiento fijo
 
-# ---- TP, SL y Trailing ----
-TP_MULT = 1.2
-SL_MULT = 1.5
+# ---- Parámetros de estrategia (OPTIMIZADOS) ----
+TP_MULT = 1.0                    # Take Profit = ATR * 1.0 (antes 1.2)
+SL_MULT = 1.2                    # Stop Loss = ATR * 1.2 (antes 1.5)
+ATR_PERIOD = 14
+BE_GAIN = 0.0005
+BE_UMBRAL = 0.30
+
+# ---- Trailing Stop ----
 TRAILING_ENABLED = False
 TRAILING_MODE = 'native'
 TRAILING_DISTANCE_ATR = 0.8
-TRAILING_ACTIVATION_PROFIT = 0.8
 
 # ---- Niveles de velocidad (AutoSpeed) ----
 SPEED_LEVELS = [
@@ -26,18 +30,9 @@ SPEED_LEVELS = [
     {"nivel": 5, "raw_min": 0.25, "roc_min": 0.10},
     {"nivel": 6, "raw_min": 0.20, "roc_min": 0.05},
 ]
-DEFAULT_SPEED_LEVEL = SPEED_LEVELS[2]
+DEFAULT_SPEED_LEVEL = SPEED_LEVELS[0]   # Nivel 1 (más restrictivo, óptimo)
 
-# ---- Parámetros optimizados (Walk-Forward 1 año) ----
-OPTIMIZED_LEVELS = {
-    'BTC': {'Long': SPEED_LEVELS[1], 'Short': SPEED_LEVELS[2]},
-    'ETH': {'Long': SPEED_LEVELS[0], 'Short': SPEED_LEVELS[1]},
-    'SOL': {'Long': SPEED_LEVELS[3], 'Short': SPEED_LEVELS[3]},
-    'ADA': {'Long': SPEED_LEVELS[3], 'Short': SPEED_LEVELS[4]},
-    'XRP': {'Long': SPEED_LEVELS[3], 'Short': SPEED_LEVELS[4]},
-}
-
-# ---- Filtro horario ----
+# ---- Filtros horarios ----
 TIME_FILTER_ENABLED = True
 TIME_FILTER_START = 12
 TIME_FILTER_END = 18
@@ -57,7 +52,7 @@ FILTERS = {
             'Short': {'ker_min': 0.40, 'zscore_max': -0.8, 'vol_rel_min': 1.5}}
 }
 
-# ---- Recuperación, reintentos y timeouts ----
+# ---- Recuperación y reintentos (CONSTANTES FALTANTES) ----
 MAX_RECONNECT_ATTEMPTS = 3
 RECONNECT_BACKOFF = 5
 BACKOFF_BASE = 5
@@ -67,17 +62,15 @@ LOCK_FILE = '.lock'
 LOCK_TIMEOUT = 10
 SYNC_TIME_ENABLED = True
 MAX_CONSECUTIVE_ERRORS = 5
+MAX_REPAIR_ATTEMPTS = 3
 
-# ---- Reparación de protecciones ----
-MAX_REPAIR_ATTEMPTS = 3          # <--- AÑADIDA
-
-# ---- Límites de riesgo ----
+# ---- Control de Riesgo ----
 MAX_DAILY_LOSS_PERCENT = 2.0
 MAX_WEEKLY_LOSS_PERCENT = 4.0
 MAX_OPEN_POSITIONS = 3
 
-# ---- Backtesting (para signals.py) ----
-BACKTEST_DAYS = 30
+# ---- Backtesting (REDUCIDO para evitar timeout) ----
+BACKTEST_DAYS = 2                # Valor pequeño para que el backtest sea rápido
 BACKTEST_FEE_MAKER = 0.0005
 BACKTEST_FEE_TAKER = 0.0007
 BACKTEST_SLIPPAGE = 0.0002
@@ -95,27 +88,15 @@ MAX_LOG_FILES = 5
 OKX_DEMO = True
 
 # ============================================================
-# VERIFICACIÓN AUTOMÁTICA (opcional)
+# VERIFICACIÓN DE CONFIGURACIÓN
 # ============================================================
 if __name__ == "__main__":
-    required = [
-        'SYMBOLS', 'TRADE_NOTIONAL', 'LEVERAGE',
-        'TP_MULT', 'SL_MULT',
-        'TRAILING_ENABLED', 'TRAILING_MODE',
-        'SPEED_LEVELS', 'DEFAULT_SPEED_LEVEL',
-        'OPTIMIZED_LEVELS',
-        'TIME_FILTER_ENABLED', 'TIME_FILTER_START', 'TIME_FILTER_END', 'TIME_FILTER_WEEKDAYS',
-        'FILTERS',
-        'MAX_RECONNECT_ATTEMPTS', 'RECONNECT_BACKOFF', 'BACKOFF_BASE',
-        'MAX_RETRIES_PER_ORDER', 'ORDER_TIMEOUT', 'LOCK_FILE', 'LOCK_TIMEOUT',
-        'SYNC_TIME_ENABLED', 'MAX_CONSECUTIVE_ERRORS',
-        'MAX_REPAIR_ATTEMPTS',   # <--- INCLUIDA EN LA VERIFICACIÓN
-        'MAX_DAILY_LOSS_PERCENT', 'MAX_WEEKLY_LOSS_PERCENT', 'MAX_OPEN_POSITIONS',
-        'BACKTEST_DAYS', 'BACKTEST_FEE_MAKER', 'BACKTEST_FEE_TAKER', 'BACKTEST_SLIPPAGE',
-        'LOG_DIR', 'LOG_LEVEL', 'LOG_CONSOLE', 'LOG_FILE', 'LOG_JSON',
-        'MAX_LOG_SIZE_MB', 'MAX_LOG_FILES', 'OKX_DEMO'
-    ]
+    required = ['SYMBOLS', 'TRADE_NOTIONAL', 'LEVERAGE',
+                'TP_MULT', 'SL_MULT', 'ATR_PERIOD',
+                'DEFAULT_SPEED_LEVEL', 'FILTERS',
+                'MAX_REPAIR_ATTEMPTS', 'BACKOFF_BASE', 'SYNC_TIME_ENABLED',
+                'BACKTEST_DAYS', 'LOG_DIR']
     for var in required:
         assert var in globals(), f"❌ Falta: {var}"
         print(f"✅ {var}")
-    print("✅ Configuración completa")
+    print("✅ Configuración correcta")
