@@ -1,5 +1,8 @@
 # main.py
-# Versión 3.0 – 2026-06-24
+# ============================================================
+# PUNTAL PRINCIPAL DEL BOT – VERSIÓN COMPLETA
+# Basada en Bot-Privado-verifyed-and-certifyed-, adaptada para Bird-of-Prey
+# ============================================================
 
 import os
 import sys
@@ -10,10 +13,23 @@ import traceback
 import numpy as np
 from datetime import datetime, timedelta
 from enum import Enum
+
+# ============================================================
+# IMPORTACIONES DESDE MÓDULOS PROPIOS
+# ============================================================
 from config import *
 from telemetry import telemetry
 from exchange import Exchange
-from signals import fetch_okx_candles, fetch_historical, calc_pidelta_score, generate_signal, check_filters
+from signals import (
+    fetch_okx_candles,
+    fetch_historical,
+    calc_pidelta_score,
+    generate_signal,
+    check_filters,
+    calculate_atr,         # 🔥 CORREGIDO: importación explícita
+    calculate_ker,
+    calculate_vwap_zscore
+)
 from strategy import get_best_signal
 from monitor import monitor_position
 from repair import repair_protections
@@ -73,16 +89,51 @@ def update_stats(state, new_trade):
     return state
 
 # ============================================================
-# BACKTESTING (AUTOSPEED)
+# CONTROL DE RIESGO
+# ============================================================
+
+def risk_check(state, equity):
+    """Verifica límites de pérdida diaria, semanal y cooldown."""
+    today = datetime.utcnow().date().isoformat()
+    daily_pnl = state['daily_pnl'].get(today, 0.0)
+    daily_loss_pct = abs(daily_pnl) / equity * 100 if equity > 0 else 0
+    if daily_loss_pct > MAX_DAILY_LOSS_PERCENT:
+        telemetry.log_warning("risk", "Límite de pérdida diaria superado", {'daily_loss': daily_loss_pct})
+        return False
+
+    week_start = (datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())).date().isoformat()
+    weekly_pnl = sum([v for k, v in state['daily_pnl'].items() if k >= week_start])
+    weekly_loss_pct = abs(weekly_pnl) / equity * 100 if equity > 0 else 0
+    if weekly_loss_pct > MAX_WEEKLY_LOSS_PERCENT:
+        telemetry.log_warning("risk", "Límite de pérdida semanal superado", {'weekly_loss': weekly_loss_pct})
+        return False
+
+    if state.get('cooldown_until'):
+        cooldown_until = datetime.fromisoformat(state['cooldown_until'])
+        if datetime.utcnow() < cooldown_until:
+            telemetry.log_warning("risk", "Cooldown activo", {'hasta': state['cooldown_until']})
+            return False
+
+    # Health check
+    health = health_check()
+    if not health.get('ok', False):
+        telemetry.log_warning("risk", "Health check fallido", health)
+        return False
+
+    return True
+
+# ============================================================
+# BACKTESTING PARA AUTOSPEED
 # ============================================================
 
 def run_backtest(symbol, direction, speed_level, days=90):
+    """Ejecuta backtest para un símbolo, dirección y nivel de velocidad."""
     df = fetch_historical(symbol, days=days)
     if df.empty:
         return None
 
     trades = []
-    for i in range(30, len(df)):  # empezar después de tener suficientes datos
+    for i in range(30, len(df)):
         window = df.iloc[max(0, i-50):i+1]
         raw_score, senal = calc_pidelta_score(window)
         if senal == 0:
@@ -116,7 +167,7 @@ def run_backtest(symbol, direction, speed_level, days=90):
             continue
 
         entry = close
-        atr = calculate_atr(df, period=14).iloc[i]
+        atr = calculate_atr(df, period=14).iloc[i]  # 🔥 CORREGIDO: calculate_atr ahora está importado
         if direction == 'Long':
             tp = entry + atr * TP_MULT
             sl = entry - atr * SL_MULT
@@ -168,13 +219,14 @@ def run_backtest(symbol, direction, speed_level, days=90):
     return {'total_trades': total, 'winrate': winrate, 'profit_factor': pf, 'expectancy': expectancy}
 
 def select_speed_level(symbol, direction):
+    """Selecciona el nivel de velocidad óptimo basado en backtest."""
     best_level = None
     best_score = -float('inf')
     for level in SPEED_LEVELS:
         metrics = run_backtest(symbol, direction, level, days=BACKTEST_DAYS)
         if metrics is None:
             continue
-        score = metrics['winrate'] * metrics['profit_factor']  # métrica compuesta
+        score = metrics['winrate'] * metrics['profit_factor']
         if score > best_score:
             best_score = score
             best_level = level
@@ -184,40 +236,7 @@ def select_speed_level(symbol, direction):
     return best_level
 
 # ============================================================
-# CONTROL DE RIESGO
-# ============================================================
-
-def risk_check(state, equity):
-    today = datetime.utcnow().date().isoformat()
-    daily_pnl = state['daily_pnl'].get(today, 0.0)
-    daily_loss_pct = abs(daily_pnl) / equity * 100 if equity > 0 else 0
-    if daily_loss_pct > MAX_DAILY_LOSS_PERCENT:
-        telemetry.log_warning("risk", "Límite de pérdida diaria superado", {'daily_loss': daily_loss_pct})
-        return False
-
-    week_start = (datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())).date().isoformat()
-    weekly_pnl = sum([v for k, v in state['daily_pnl'].items() if k >= week_start])
-    weekly_loss_pct = abs(weekly_pnl) / equity * 100 if equity > 0 else 0
-    if weekly_loss_pct > MAX_WEEKLY_LOSS_PERCENT:
-        telemetry.log_warning("risk", "Límite de pérdida semanal superado", {'weekly_loss': weekly_loss_pct})
-        return False
-
-    if state.get('cooldown_until'):
-        cooldown_until = datetime.fromisoformat(state['cooldown_until'])
-        if datetime.utcnow() < cooldown_until:
-            telemetry.log_warning("risk", "Cooldown activo", {'hasta': state['cooldown_until']})
-            return False
-
-    # Health check
-    health = health_check()
-    if not health.get('ok', False):
-        telemetry.log_warning("risk", "Health check fallido", health)
-        return False
-
-    return True
-
-# ============================================================
-# CLASE BOT
+# CLASE BOT – MÁQUINA DE ESTADOS
 # ============================================================
 
 class BotState(Enum):
@@ -293,6 +312,10 @@ class Bot:
         elif self.state == BotState.SHUTDOWN:
             self._shutdown()
 
+    # ============================================================
+    # MÉTODOS DE ESTADO
+    # ============================================================
+
     def _init(self):
         telemetry.log_info("main", "Inicializando...")
         self.state = BotState.LOAD_CONFIG
@@ -345,27 +368,24 @@ class Bot:
 
     def _select_speed(self):
         telemetry.log_info("main", "Seleccionando niveles de velocidad (AutoSpeed)...")
-        state = self.state_data
-        if 'speed_levels' not in state or not state['speed_levels']:
+        if 'speed_levels' not in self.state_data or not self.state_data['speed_levels']:
             speed_levels = {}
             for symbol in SYMBOLS:
                 speed_levels[symbol] = {}
                 for direction in ['Long', 'Short']:
                     level = select_speed_level(symbol, direction)
                     speed_levels[symbol][direction] = level
-            state['speed_levels'] = speed_levels
-            save_state(state)
+            self.state_data['speed_levels'] = speed_levels
+            save_state(self.state_data)
         self.state = BotState.SEARCH_SIGNAL
 
     def _search_signal(self):
         telemetry.log_info("main", "Buscando señal...")
-        # Verificar horario
         if not is_trading_time():
             telemetry.log_info("main", "Fuera de horario de trading, esperando")
             self.state = BotState.WAIT_NEXT_CYCLE
             return
 
-        # Verificar límite de posiciones abiertas
         if len([p for p in self.state_data['positions'].values() if p.get('entry')]) >= MAX_OPEN_POSITIONS:
             telemetry.log_warning("main", "Límite de posiciones abiertas alcanzado")
             self.state = BotState.WAIT_NEXT_CYCLE
@@ -405,7 +425,6 @@ class Bot:
         order = self.exchange.place_market_order(self.signal.symbol, side, size)
         if order.get('ok'):
             telemetry.log_info("main", "Orden ejecutada", order)
-            # Guardar posición en state
             self.state_data['positions'][self.signal.symbol] = {
                 'entry': self.signal.entry_price,
                 'size': size,
