@@ -1,6 +1,8 @@
 # config.py
-# Versión 3.0 – 2026-06-24
-# Configuración central del bot PiDelta (AutoSpeed + Riesgo + Trailing)
+# ============================================================
+# CONFIGURACIÓN CENTRAL DEL BOT – VERSIÓN COMPLETA
+# Basada en Bot-Privado-verifyed-and-certifyed-, adaptada para Bird-of-Prey
+# ============================================================
 
 # ============================================================
 # SÍMBOLOS Y OPERATIVA
@@ -67,15 +69,16 @@ FILTERS = {
 }
 
 # ============================================================
-# RECUPERACIÓN, REINTENTOS Y TIMEOUTS (mejorados)
+# RECUPERACIÓN, REINTENTOS Y TIMEOUTS
 # ============================================================
 MAX_RECONNECT_ATTEMPTS = 3
 RECONNECT_BACKOFF = 5        # Base para backoff exponencial (segundos)
+BACKOFF_BASE = 5             # Alias para compatibilidad
 MAX_RETRIES_PER_ORDER = 3
 ORDER_TIMEOUT = 15
 LOCK_FILE = '.lock'
 LOCK_TIMEOUT = 10
-MAX_REPAIR_ATTEMPTS = 3      # Límite de intentos de reparación de protecciones
+MAX_REPAIR_ATTEMPTS = 3      # Límite de intentos de reparación
 SYNC_TIME_ENABLED = True     # Sincronización horaria con OKX
 
 # ============================================================
@@ -106,11 +109,11 @@ MAX_DAILY_LOSS_PERCENT = 2.0      # 2% de pérdida diaria máxima
 MAX_WEEKLY_LOSS_PERCENT = 4.0     # 4% de pérdida semanal máxima
 MAX_DRAWDOWN_PERCENT = 10.0
 MAX_OPEN_POSITIONS = 3            # Número máximo de posiciones simultáneas
-COOLDOWN_AFTER_LOSSES = 3         # Número de pérdidas consecutivas para activar cooldown
+COOLDOWN_AFTER_LOSSES = 3         # Número de pérdidas consecutivas para cooldown
 COOLDOWN_MINUTES = 60             # Duración del cooldown en minutos
 
 # ============================================================
-# BACKTESTING
+# BACKTESTING (AutoSpeed)
 # ============================================================
 BACKTEST_DAYS = 90
 BACKTEST_FEE_MAKER = 0.0005
@@ -124,9 +127,13 @@ if __name__ == "__main__":
     print("="*70)
     print("🧪 VERIFICACIÓN DE CONFIGURACIÓN")
     print("="*70)
-    required = ['SYMBOLS', 'TRADE_NOTIONAL', 'LEVERAGE', 'TP_MULT', 'SL_MULT',
-                'TRAILING_ENABLED', 'TRAILING_DISTANCE_ATR', 'DEFAULT_SPEED_LEVEL',
-                'TIME_FILTER_ENABLED', 'FILTERS', 'LOG_DIR', 'MAX_REPAIR_ATTEMPTS']
+    required = [
+        'SYMBOLS', 'TRADE_NOTIONAL', 'LEVERAGE', 'TP_MULT', 'SL_MULT',
+        'TRAILING_ENABLED', 'TRAILING_DISTANCE_ATR', 'DEFAULT_SPEED_LEVEL',
+        'TIME_FILTER_ENABLED', 'FILTERS', 'LOG_DIR',
+        'MAX_REPAIR_ATTEMPTS', 'BACKOFF_BASE', 'SYNC_TIME_ENABLED',
+        'MAX_DAILY_LOSS_PERCENT', 'MAX_WEEKLY_LOSS_PERCENT', 'MAX_OPEN_POSITIONS'
+    ]
     for v in required:
         assert v in globals(), f"Falta {v}"
         print(f"  ✅ {v}")
