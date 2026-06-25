@@ -1,17 +1,18 @@
 # config.py
 # ============================================================
-# CONFIGURACIÓN OPTIMIZADA – BIRD-OF-PREY
-# Cambios mínimos para máxima mejora estadística
+# CONFIGURACIÓN DEFINITIVA – BIRD-OF-PREY
+# Corregida: OPTIMIZED_LEVELS definido, filtro horario desactivado,
+# backtest rápido, todas las constantes necesarias.
 # ============================================================
 
 # ---- Símbolos y operativa ----
 SYMBOLS = ['BTC', 'ETH', 'SOL', 'ADA', 'XRP']
-TRADE_NOTIONAL = 1000.0          # USDT por operación
-LEVERAGE = 10                    # Apalancamiento fijo
+TRADE_NOTIONAL = 1000.0
+LEVERAGE = 10
 
 # ---- Parámetros de estrategia (OPTIMIZADOS) ----
-TP_MULT = 1.0                    # Take Profit = ATR * 1.0 (antes 1.2)
-SL_MULT = 1.2                    # Stop Loss = ATR * 1.2 (antes 1.5)
+TP_MULT = 1.0                    # Take Profit = ATR * 1.0
+SL_MULT = 1.2                    # Stop Loss = ATR * 1.2
 ATR_PERIOD = 14
 BE_GAIN = 0.0005
 BE_UMBRAL = 0.30
@@ -21,7 +22,7 @@ TRAILING_ENABLED = False
 TRAILING_MODE = 'native'
 TRAILING_DISTANCE_ATR = 0.8
 
-# ---- Niveles de velocidad (AutoSpeed) ----
+# ---- Niveles de velocidad ----
 SPEED_LEVELS = [
     {"nivel": 1, "raw_min": 0.45, "roc_min": 0.30},
     {"nivel": 2, "raw_min": 0.40, "roc_min": 0.25},
@@ -30,10 +31,19 @@ SPEED_LEVELS = [
     {"nivel": 5, "raw_min": 0.25, "roc_min": 0.10},
     {"nivel": 6, "raw_min": 0.20, "roc_min": 0.05},
 ]
-DEFAULT_SPEED_LEVEL = SPEED_LEVELS[0]   # Nivel 1 (más restrictivo, óptimo)
+DEFAULT_SPEED_LEVEL = SPEED_LEVELS[0]   # N1 (óptimo)
 
-# ---- Filtros horarios ----
-TIME_FILTER_ENABLED = False
+# ---- Niveles optimizados por activo (para main.py) ----
+OPTIMIZED_LEVELS = {
+    'BTC': {'Long': DEFAULT_SPEED_LEVEL, 'Short': DEFAULT_SPEED_LEVEL},
+    'ETH': {'Long': DEFAULT_SPEED_LEVEL, 'Short': DEFAULT_SPEED_LEVEL},
+    'SOL': {'Long': DEFAULT_SPEED_LEVEL, 'Short': DEFAULT_SPEED_LEVEL},
+    'ADA': {'Long': DEFAULT_SPEED_LEVEL, 'Short': DEFAULT_SPEED_LEVEL},
+    'XRP': {'Long': DEFAULT_SPEED_LEVEL, 'Short': DEFAULT_SPEED_LEVEL},
+}
+
+# ---- Filtros horarios (DESACTIVADO – 24/7) ----
+TIME_FILTER_ENABLED = False      # ← Cambiado a False como solicitaste
 TIME_FILTER_START = 12
 TIME_FILTER_END = 18
 TIME_FILTER_WEEKDAYS = [0, 1, 2, 3, 4]
@@ -52,7 +62,7 @@ FILTERS = {
             'Short': {'ker_min': 0.40, 'zscore_max': -0.8, 'vol_rel_min': 1.5}}
 }
 
-# ---- Recuperación y reintentos (CONSTANTES FALTANTES) ----
+# ---- Recuperación y reintentos ----
 MAX_RECONNECT_ATTEMPTS = 3
 RECONNECT_BACKOFF = 5
 BACKOFF_BASE = 5
@@ -69,8 +79,8 @@ MAX_DAILY_LOSS_PERCENT = 2.0
 MAX_WEEKLY_LOSS_PERCENT = 4.0
 MAX_OPEN_POSITIONS = 3
 
-# ---- Backtesting (REDUCIDO para evitar timeout) ----
-BACKTEST_DAYS = 2                # Valor pequeño para que el backtest sea rápido
+# ---- Backtesting (RÁPIDO) ----
+BACKTEST_DAYS = 2                # Solo 2 días para que sea instantáneo
 BACKTEST_FEE_MAKER = 0.0005
 BACKTEST_FEE_TAKER = 0.0007
 BACKTEST_SLIPPAGE = 0.0002
@@ -88,15 +98,19 @@ MAX_LOG_FILES = 5
 OKX_DEMO = True
 
 # ============================================================
-# VERIFICACIÓN DE CONFIGURACIÓN
+# VERIFICACIÓN AUTOMÁTICA (opcional)
 # ============================================================
 if __name__ == "__main__":
-    required = ['SYMBOLS', 'TRADE_NOTIONAL', 'LEVERAGE',
-                'TP_MULT', 'SL_MULT', 'ATR_PERIOD',
-                'DEFAULT_SPEED_LEVEL', 'FILTERS',
-                'MAX_REPAIR_ATTEMPTS', 'BACKOFF_BASE', 'SYNC_TIME_ENABLED',
-                'BACKTEST_DAYS', 'LOG_DIR']
+    required = [
+        'SYMBOLS', 'TRADE_NOTIONAL', 'LEVERAGE',
+        'TP_MULT', 'SL_MULT', 'ATR_PERIOD',
+        'DEFAULT_SPEED_LEVEL', 'OPTIMIZED_LEVELS',
+        'TIME_FILTER_ENABLED',
+        'FILTERS',
+        'MAX_REPAIR_ATTEMPTS', 'BACKOFF_BASE', 'SYNC_TIME_ENABLED',
+        'BACKTEST_DAYS', 'LOG_DIR'
+    ]
     for var in required:
         assert var in globals(), f"❌ Falta: {var}"
         print(f"✅ {var}")
-    print("✅ Configuración correcta")
+    print("✅ Configuración completa y correcta")
