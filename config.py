@@ -33,7 +33,7 @@ SPEED_LEVELS = [
 DEFAULT_SPEED_LEVEL = SPEED_LEVELS[0]   # Nivel 1 (más restrictivo, óptimo)
 
 # ---- Filtros horarios ----
-TIME_FILTER_ENABLED = True
+TIME_FILTER_ENABLED = False
 TIME_FILTER_START = 12
 TIME_FILTER_END = 18
 TIME_FILTER_WEEKDAYS = [0, 1, 2, 3, 4]
