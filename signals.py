@@ -1,5 +1,7 @@
 # signals.py
-# Versión 3.0 – 2026-06-24
+# ============================================================
+# SEÑALES – VERSIÓN CORREGIDA Y OPTIMIZADA
+# ============================================================
 
 import pandas as pd
 import numpy as np
@@ -12,7 +14,7 @@ from models import Signal
 from telemetry import telemetry
 
 # ============================================================
-# INDICADORES
+# 1. INDICADORES
 # ============================================================
 
 def calculate_ker(series: pd.Series, period: int = 10) -> pd.Series:
@@ -43,7 +45,6 @@ def calculate_roc(series: pd.Series, period: int = 10) -> pd.Series:
     return roc.fillna(0)
 
 def calculate_macro(df: pd.DataFrame) -> float:
-    """Indicador de macro (volatilidad + tendencia)."""
     atr = calculate_atr(df, 14).iloc[-1]
     close = df['c'].iloc[-1]
     vol_ratio = atr / (close + 1e-6)
@@ -52,11 +53,10 @@ def calculate_macro(df: pd.DataFrame) -> float:
     return max(0, min(1, macro))
 
 # ============================================================
-# DESCARGA DE DATOS REALES (OKX)
+# 2. DESCARGA DE DATOS (OKX)
 # ============================================================
 
 def fetch_okx_candles(symbol: str, bar: str = "5m", limit: int = 150) -> pd.DataFrame:
-    """Descarga velas de OKX usando la API pública."""
     inst_id = f"{symbol}-USDT-SWAP"
     url = f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar={bar}&limit={min(limit, 300)}"
     try:
@@ -97,7 +97,7 @@ def fetch_historical(symbol: str, days: int = 90) -> pd.DataFrame:
                 break
             all_candles.extend(candles)
             after = int(candles[-1][0])
-            time.sleep(0.1)  # evitar rate limit
+            time.sleep(0.1)
         except Exception as e:
             telemetry.log_error("signals", f"Error en fetch_historical: {e}", {'symbol': symbol})
             break
@@ -110,7 +110,7 @@ def fetch_historical(symbol: str, days: int = 90) -> pd.DataFrame:
     return df.sort_values('ts').reset_index(drop=True)
 
 # ============================================================
-# CÁLCULO DEL SCORE PiDelta
+# 3. CÁLCULO DEL SCORE PiDelta
 # ============================================================
 
 def calc_pidelta_score(df: pd.DataFrame) -> tuple:
@@ -123,14 +123,13 @@ def calc_pidelta_score(df: pd.DataFrame) -> tuple:
     atr = calculate_atr(df, period=14).iloc[-1]
     micro = slope / (atr + 1e-6)
     ker = calculate_ker(close, period=10).iloc[-1]
-    # Macro simplificado (se puede usar calculate_macro)
-    macro = calculate_macro(df)  # ya usa la última fila
+    macro = calculate_macro(df)
     raw_score = np.tanh(micro * ker * macro)
     senal = 1 if raw_score > 0.20 else (-1 if raw_score < -0.20 else 0)
     return raw_score, senal
 
 # ============================================================
-# VERIFICACIÓN DE FILTROS POR ACTIVO/DIRECCIÓN
+# 4. VERIFICACIÓN DE FILTROS POR ACTIVO (CORREGIDO)
 # ============================================================
 
 def check_filters(df: pd.DataFrame, idx: int, direccion: str, symbol: str) -> bool:
@@ -138,12 +137,12 @@ def check_filters(df: pd.DataFrame, idx: int, direccion: str, symbol: str) -> bo
         return False
     cfg = FILTERS.get(symbol, {}).get(direccion, {})
     if not cfg:
-        return True  # sin filtros, pasa
+        return True
 
-    # Cálculos comunes
+    # 🔥 CORRECCIÓN: calcular atr antes de usarlo
+    atr = calculate_atr(df, period=14).iloc[idx]
     ker = calculate_ker(df['c'], 10).iloc[idx]
     zscore = calculate_vwap_zscore(df, 20).iloc[idx]
-    atr = calculate_atr(df, 14).iloc[idx]
     atr_pct = (atr / df['c'].iloc[idx]) * 100 if df['c'].iloc[idx] > 0 else 0
     vol_rel = df['vol'].iloc[idx] / (df['vol'].rolling(20).mean().iloc[idx] + 1e-6)
     ema20 = df['c'].ewm(span=20).mean().iloc[idx]
@@ -167,18 +166,17 @@ def check_filters(df: pd.DataFrame, idx: int, direccion: str, symbol: str) -> bo
             return False
         if 'vol_rel_min' in cfg and vol_rel < cfg['vol_rel_min']:
             return False
-        # atr_percent_min se puede aplicar a ambas direcciones, pero no está en Short por defecto
+        # Nota: atr_percent_min se puede aplicar a ambas direcciones, pero no está en Short por defecto
     return True
 
 # ============================================================
-# GENERACIÓN DE SEÑAL
+# 5. GENERACIÓN DE SEÑAL (CORREGIDO)
 # ============================================================
 
 def generate_signal(df: pd.DataFrame, symbol: str, direction: str, speed_level: dict) -> Optional[Signal]:
     if df.empty or len(df) < 30:
         return None
 
-    # Última fila
     last = df.iloc[-1]
     raw_score, senal = calc_pidelta_score(df)
     if senal == 0:
@@ -188,14 +186,12 @@ def generate_signal(df: pd.DataFrame, symbol: str, direction: str, speed_level: 
     if direction == 'Short' and senal != -1:
         return None
 
-    # Aplicar filtros
     if not check_filters(df, len(df)-1, direction, symbol):
         return None
 
-    # Filtros de velocidad (raw_min y roc_min)
     raw_th = speed_level['raw_min']
     roc_th = speed_level['roc_min']
-    roc_val = calculate_roc(df['c'], 1).iloc[-1]  # ROC de 1 vela (≈ cambio %)
+    roc_val = calculate_roc(df['c'], 1).iloc[-1]
     if direction == 'Long':
         if not (abs(raw_score) > raw_th and roc_val > roc_th):
             return None
@@ -203,19 +199,16 @@ def generate_signal(df: pd.DataFrame, symbol: str, direction: str, speed_level: 
         if not (abs(raw_score) > raw_th and roc_val < -roc_th):
             return None
 
-    # Anti-Chase (evitar entrar en puntas)
-    high = df['h'].iloc[-1]
-    low = df['l'].iloc[-1]
-    close = df['c'].iloc[-1]
+    # Anti-Chase
+    high, low, close = df['h'].iloc[-1], df['l'].iloc[-1], df['c'].iloc[-1]
     if high - low <= 0:
         return None
     pos = (close - low) / (high - low)
     if direction == 'Long' and pos > 0.70:
         return None
-    if direction == 'Short' and pos < 0.30:  # precio cerca del mínimo
+    if direction == 'Short' and pos < 0.30:
         return None
 
-    # Cálculo de TP/SL
     atr = calculate_atr(df, 14).iloc[-1]
     entry = close
     if direction == 'Long':
@@ -225,10 +218,10 @@ def generate_signal(df: pd.DataFrame, symbol: str, direction: str, speed_level: 
         tp = entry - atr * TP_MULT
         sl = entry + atr * SL_MULT
 
-    # Confianza
     confidence = min(1.0, abs(raw_score) * 1.2 + 0.1)
     speed_score = abs(raw_score) * (1 + abs(roc_val) / 10)
 
+    # 🔥 CORRECCIÓN: usar 'nivel' en lugar de 'name'
     return Signal(
         symbol=symbol,
         direction=direction,
